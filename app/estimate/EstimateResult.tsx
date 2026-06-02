@@ -20,7 +20,7 @@ interface EstimateData {
   estimateNumber: string
   businessName: string
   businessPhone: string
-  businessEmail: string
+  businessEmail?: string
   jobDescription: string
   tradeType: string
   date: string
