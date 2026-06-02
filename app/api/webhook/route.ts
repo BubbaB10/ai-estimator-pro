@@ -27,9 +27,8 @@ export async function POST(req: NextRequest) {
 
   switch (event.type) {
     case 'checkout.session.completed': {
-      const session = event.data.object as Stripe.CheckoutSession
+      const session = event.data.object as Stripe.Checkout.Session
       console.log('New subscription:', session.id, session.customer_email)
-      // TODO: Store customer → subscription mapping in DB for persistent auth
       break
     }
     case 'customer.subscription.created':
@@ -54,5 +53,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ received: true })
 }
-
-// App Router: body is read as text above, no config needed

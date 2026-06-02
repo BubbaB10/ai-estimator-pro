@@ -16,18 +16,18 @@ export async function POST(req: NextRequest) {
       expand: ['subscription'],
     })
 
+    const subscription = session.subscription as Stripe.Subscription | null
+
     const isValid =
       session.payment_status === 'paid' ||
       session.status === 'complete' ||
-      (session.subscription &&
-        typeof session.subscription === 'object' &&
-        (session.subscription.status === 'active' || session.subscription.status === 'trialing'))
+      (subscription && (subscription.status === 'active' || subscription.status === 'trialing'))
 
     return NextResponse.json({
       valid: isValid,
       customerId: session.customer,
-      subscriptionId: typeof session.subscription === 'object' ? session.subscription?.id : session.subscription,
-      status: typeof session.subscription === 'object' ? session.subscription?.status : null,
+      subscriptionId: subscription?.id ?? null,
+      status: subscription?.status ?? null,
     })
   } catch (error: unknown) {
     console.error('Verify subscription error:', error)
