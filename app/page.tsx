@@ -282,12 +282,12 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
-              <a href="mailto:support@micro-titan.com?subject=AI Estimator Pro — Pro Plan Interest" style={{ display: 'block', textDecoration: 'none' }}>
+              <a href="https://buy.stripe.com/eVq9AL6cR6KY71Yba8g7e08" style={{ display: 'block', textDecoration: 'none' }}>
                 <button className="btn-primary" style={{ width: '100%', fontSize: '1rem', padding: '14px' }}>
                   Get Pro — $149/mo →
                 </button>
               </a>
-              <p style={{ marginTop: '10px', color: '#64748b', fontSize: '0.8rem', textAlign: 'center' }}>Email us to get set up on Pro</p>
+              <p style={{ marginTop: '10px', color: '#64748b', fontSize: '0.8rem', textAlign: 'center' }}>Secure checkout via Stripe</p>
             </div>
           </div>
         </div>
