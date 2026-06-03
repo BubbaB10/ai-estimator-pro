@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import Stripe from 'stripe'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' })
 
 function generateEstimateNumber(): string {
   const prefix = 'EST'
@@ -11,87 +9,120 @@ function generateEstimateNumber(): string {
   return `${prefix}-${num}`
 }
 
+function getTradeIcon(trade: string): string {
+  const icons: Record<string, string> = {
+    'Plumbing': '🔧',
+    'Electrical': '⚡',
+    'HVAC': '❄️',
+    'Roofing': '🏠',
+    'General Contractor': '🔨',
+    'Painting': '🎨',
+    'Carpentry': '🪵',
+    'Flooring': '🪟',
+    'Landscaping': '🌿',
+    'Other': '🛠️',
+  }
+  return icons[trade] || '🛠️'
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { jobDescription, tradeType, businessName, businessPhone, businessEmail, taxRate = 8.25, imageBase64, sessionId } = body
+    const {
+      jobDescription,
+      tradeType,
+      location,
+      planImageBase64,
+      isPlanUpload = false,
+    } = body
 
-    // Verify subscription
-    if (sessionId) {
-      try {
-        const session = await stripe.checkout.sessions.retrieve(sessionId)
-        if (session.payment_status !== 'paid' && session.status !== 'complete') {
-          return NextResponse.json({ error: 'Payment required' }, { status: 402 })
-        }
-      } catch {
-        return NextResponse.json({ error: 'Invalid session' }, { status: 402 })
-      }
-    } else {
-      // Check for active subscription via customer email or subscription header
-      const authHeader = req.headers.get('x-subscription-id')
-      if (authHeader) {
-        try {
-          const sub = await stripe.subscriptions.retrieve(authHeader)
-          if (sub.status !== 'active' && sub.status !== 'trialing') {
-            return NextResponse.json({ error: 'Subscription not active' }, { status: 402 })
-          }
-        } catch {
-          return NextResponse.json({ error: 'Invalid subscription' }, { status: 402 })
-        }
-      }
-      // In development / demo mode — allow without payment
-      // In production, you'd enforce payment here
-    }
+    const tradeIcon = getTradeIcon(tradeType)
 
-    const systemPrompt = `You are an expert ${tradeType} contractor estimator with 20+ years of experience. You create precise, professional estimates with accurate labor rates and material costs based on current market prices.
+    const systemPrompt = `You are an expert ${tradeType} contractor estimator with 25+ years of field experience. You specialize in helping small 1-5 person contractor shops price jobs correctly so they never undercharge.
 
-Generate a detailed estimate with realistic line items. Break everything down by:
-- Labor (hours × rate)  
-- Materials (with quantities)
-- Equipment rental if needed
-- Service/diagnostic fees
-- Permits if applicable
+CRITICAL RULE: Always output a LOW / MID / HIGH range. Never give a single price. The contractor needs to protect themselves from undercharging.
 
-Use these guidelines for rates:
-- Plumbing labor: $85-120/hr
-- Electrical labor: $90-130/hr  
-- HVAC labor: $90-125/hr
-- Roofing labor: $60-100/hr
-- General contractor: $65-100/hr
-- Other trades: $60-100/hr
+Your job:
+1. Analyze the job described
+2. Determine how much detail was provided (confidence level)
+3. Output a complete JSON estimate with three price tiers
+4. List ALL assumptions you made
+5. List what would change the price
 
-Always respond with ONLY valid JSON in this exact format:
+Confidence levels:
+- "low" = very vague description, minimal detail → wide range (40-60% spread), strong warning
+- "medium" = some detail but missing key info → moderate range (20-35% spread)
+- "high" = detailed description or plan sheet → tight range (10-20% spread)
+
+Labor rate guidelines:
+- Plumbing: $85–$125/hr
+- Electrical: $90–$135/hr
+- HVAC: $90–$130/hr
+- Roofing: $60–$100/hr
+- General Contractor: $65–$105/hr
+- Painting: $50–$85/hr
+- Carpentry: $65–$110/hr
+- Other trades: $55–$100/hr
+
+ALWAYS respond with ONLY valid JSON in this exact structure:
 {
+  "confidence": "low" | "medium" | "high",
+  "confidenceMissing": ["list of items that would improve confidence if provided"],
+  "jobSummary": "One sentence description of the job",
+  "conservative": number,
+  "mostLikely": number,
+  "fullScope": number,
   "lineItems": [
     {
-      "description": "string - clear description of work or material",
-      "qty": number,
-      "unitCost": number,
-      "total": number,
+      "description": "string",
+      "lowCost": number,
+      "highCost": number,
       "category": "Labor" | "Materials" | "Equipment" | "Permits" | "Other"
     }
   ],
-  "subtotal": number,
-  "notes": "string - any important notes, warranties, scope limitations, or payment terms"
+  "laborHoursLow": number,
+  "laborHoursHigh": number,
+  "laborRateLow": number,
+  "laborRateHigh": number,
+  "assumptions": ["assumption 1", "assumption 2", "assumption 3"],
+  "changeFactors": [
+    {"condition": "description of what could change price", "delta": "$X–$X,XXX"},
+    {"condition": "...", "delta": "..."}
+  ],
+  "notes": "Any important notes, permit requirements, warnings"
 }`
 
-    const userContent = jobDescription
-      ? `Trade type: ${tradeType}\n\nJob description: ${jobDescription}\n\nTax rate will be applied separately at ${taxRate}%. Generate a complete itemized estimate for this job.`
-      : `Trade type: ${tradeType}\n\nGenerate a complete itemized estimate based on the work visible in the attached photo.\n\nTax rate will be applied separately at ${taxRate}%.`
+    const userMessage = isPlanUpload
+      ? `Trade type: ${tradeType}${location ? `\nLocation/Region: ${location}` : ''}
+
+A plan sheet or drawing has been uploaded. Analyze it carefully and extract:
+- Dimensions and square footage
+- Room counts or fixture counts
+- Linear footage of any runs
+- Scope of work visible in the drawing
+
+Generate a plan-based estimate. Since this is from a plan sheet, use HIGH confidence unless the drawing is incomplete.
+
+Job description (if any): ${jobDescription || 'See uploaded plan sheet'}`
+      : `Trade type: ${tradeType}${location ? `\nLocation/Region: ${location}` : ''}
+
+Job description: ${jobDescription}
+
+Generate a complete Low/Mid/High estimate for this job.`
 
     let messages: OpenAI.Chat.ChatCompletionMessageParam[]
 
-    if (imageBase64) {
+    if (planImageBase64 && isPlanUpload) {
       messages = [
         { role: 'system', content: systemPrompt },
         {
           role: 'user',
           content: [
-            { type: 'text', text: userContent },
+            { type: 'text', text: userMessage },
             {
               type: 'image_url',
               image_url: {
-                url: `data:image/jpeg;base64,${imageBase64}`,
+                url: `data:image/jpeg;base64,${planImageBase64}`,
                 detail: 'high',
               }
             }
@@ -101,15 +132,15 @@ Always respond with ONLY valid JSON in this exact format:
     } else {
       messages = [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userContent }
+        { role: 'user', content: userMessage }
       ]
     }
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages,
-      max_tokens: 2000,
-      temperature: 0.3,
+      max_tokens: 2500,
+      temperature: 0.2,
       response_format: { type: 'json_object' },
     })
 
@@ -118,27 +149,38 @@ Always respond with ONLY valid JSON in this exact format:
 
     const aiResult = JSON.parse(content)
 
-    // Validate and recalculate
-    const lineItems = aiResult.lineItems.map((item: any) => ({
+    const lineItems = (aiResult.lineItems || []).map((item: {
+      description?: string;
+      lowCost?: number;
+      highCost?: number;
+      category?: string;
+    }) => ({
       description: String(item.description || ''),
-      qty: Number(item.qty) || 1,
-      unitCost: Number(item.unitCost) || 0,
-      total: Number(item.total) || (Number(item.qty || 1) * Number(item.unitCost || 0)),
+      lowCost: Number(item.lowCost) || 0,
+      highCost: Number(item.highCost) || 0,
       category: item.category || 'Other',
     }))
 
-    const subtotal = lineItems.reduce((sum: number, item: any) => sum + item.total, 0)
-    const tax = subtotal * (taxRate / 100)
-    const total = subtotal + tax
-
     return NextResponse.json({
+      tradeIcon,
+      tradeType,
+      location: location || null,
+      jobSummary: aiResult.jobSummary || jobDescription,
+      confidence: aiResult.confidence || 'medium',
+      confidenceMissing: aiResult.confidenceMissing || [],
+      conservative: Math.round(Number(aiResult.conservative) || 0),
+      mostLikely: Math.round(Number(aiResult.mostLikely) || 0),
+      fullScope: Math.round(Number(aiResult.fullScope) || 0),
       lineItems,
-      subtotal: Math.round(subtotal * 100) / 100,
-      tax: Math.round(tax * 100) / 100,
-      taxRate,
-      total: Math.round(total * 100) / 100,
+      laborHoursLow: Number(aiResult.laborHoursLow) || 0,
+      laborHoursHigh: Number(aiResult.laborHoursHigh) || 0,
+      laborRateLow: Number(aiResult.laborRateLow) || 0,
+      laborRateHigh: Number(aiResult.laborRateHigh) || 0,
+      assumptions: aiResult.assumptions || [],
+      changeFactors: aiResult.changeFactors || [],
       notes: aiResult.notes || '',
       estimateNumber: generateEstimateNumber(),
+      isPlanBased: isPlanUpload && !!planImageBase64,
     })
 
   } catch (error: unknown) {
