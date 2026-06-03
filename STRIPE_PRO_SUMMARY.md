@@ -25,5 +25,6 @@ Created the live $149/mo Pro tier for AI Estimator Pro and wired the landing pag
 ## Verification
 
 - Stripe product, price, and payment link were created successfully.
-- Local TypeScript checks were run after the edits.
-- Live deployment verification still needs to be checked in the browser after the push.
+- Local TypeScript checks passed after the edits.
+- Canonical live page `https://ai-estimator-pro.vercel.app` now includes the Stripe payment link.
+- HQ Dashboard portfolio detail page for AI Estimator Pro shows Basic at $49/mo and Pro at $149/mo, with the live Stripe payment link wired.
