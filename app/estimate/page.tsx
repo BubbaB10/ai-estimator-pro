@@ -2,48 +2,12 @@
 
 import { useState, useRef, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import EstimateResult from './EstimateResult'
+import EstimateWorkbench, { EstimateData } from './EstimateWorkbench'
 
 const TRADES = [
   'Plumbing', 'Electrical', 'HVAC', 'Roofing', 'General Contractor',
   'Painting', 'Carpentry', 'Flooring', 'Landscaping', 'Other'
 ]
-
-interface LineItem {
-  description: string
-  lowCost: number
-  highCost: number
-  category: string
-}
-
-interface ChangeFactor {
-  condition: string
-  delta: string
-}
-
-interface EstimateData {
-  tradeIcon: string
-  tradeType: string
-  location: string | null
-  jobSummary: string
-  confidence: 'low' | 'medium' | 'high'
-  confidenceMissing: string[]
-  conservative: number
-  mostLikely: number
-  fullScope: number
-  lineItems: LineItem[]
-  laborHoursLow: number
-  laborHoursHigh: number
-  laborRateLow: number
-  laborRateHigh: number
-  assumptions: string[]
-  changeFactors: ChangeFactor[]
-  notes: string
-  estimateNumber: string
-  isPlanBased: boolean
-  date: string
-  jobDescription: string
-}
 
 function EstimatePageInner() {
   useSearchParams() // keep for future use
@@ -152,7 +116,7 @@ function EstimatePageInner() {
 
   if (estimate) {
     return (
-      <EstimateResult
+      <EstimateWorkbench
         estimate={estimate}
         onNew={() => setEstimate(null)}
       />
@@ -179,7 +143,7 @@ function EstimatePageInner() {
       <div style={{ maxWidth: '920px', margin: '0 auto' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '8px' }}>Generate Estimate</h1>
         <p style={{ color: '#94a3b8', marginBottom: '40px' }}>
-          Describe the job or upload a plan sheet — get a Low / Mid / High range with assumptions in 30 seconds.
+          Describe the job or upload a plan sheet — get a full workbench with line items, assumptions, and what-if scenarios.
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -209,14 +173,14 @@ function EstimatePageInner() {
                 </div>
               </div>
 
-              {/* Plan Sheet Upload — Pro Feature */}
+              {/* Plan Sheet Upload */}
               <div className="card" style={{ border: isPlanMode ? '2px solid #f59e0b' : '1px solid #334155' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <h3 style={{ fontWeight: 700, fontSize: '1rem' }}>📐 Plan Sheet Upload</h3>
                   <span style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', padding: '2px 8px', borderRadius: '100px', fontSize: '0.7rem', fontWeight: 700 }}>PRO</span>
                 </div>
                 <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '14px' }}>
-                  Upload a floor plan, drawing, or photo. GPT-4o Vision will extract dimensions and scope automatically — boosts confidence to High.
+                  Upload a floor plan, drawing, or photo. GPT-4o Vision will extract dimensions and scope automatically.
                 </p>
                 <div
                   onDrop={handleDrop}
@@ -224,18 +188,11 @@ function EstimatePageInner() {
                   onClick={() => fileRef.current?.click()}
                   style={{
                     border: `2px dashed ${isPlanMode ? '#f59e0b' : '#334155'}`,
-                    borderRadius: '8px',
-                    padding: '20px',
-                    textAlign: 'center',
-                    cursor: 'pointer',
+                    borderRadius: '8px', padding: '20px', textAlign: 'center', cursor: 'pointer',
                     transition: 'border-color 0.2s, background 0.2s',
                     background: isPlanMode ? 'rgba(245,158,11,0.05)' : 'transparent',
-                    minHeight: '90px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'column',
-                    gap: '6px',
+                    minHeight: '90px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexDirection: 'column', gap: '6px',
                   }}
                 >
                   {planPreview ? (
@@ -244,29 +201,18 @@ function EstimatePageInner() {
                     <>
                       <span style={{ fontSize: '2rem' }}>📄</span>
                       <p style={{ color: '#f59e0b', fontSize: '0.9rem', fontWeight: 600 }}>{planFile.name}</p>
-                      <p style={{ color: '#64748b', fontSize: '0.75rem' }}>PDF support coming soon — image extracted</p>
                     </>
                   ) : (
                     <>
                       <span style={{ fontSize: '2rem' }}>📐</span>
                       <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Drop plan sheet here or click to upload</p>
-                      <p style={{ color: '#475569', fontSize: '0.75rem' }}>PNG, JPG up to 10MB · PDF coming soon</p>
+                      <p style={{ color: '#475569', fontSize: '0.75rem' }}>PNG, JPG up to 10MB</p>
                     </>
                   )}
                 </div>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/jpg,image/webp"
-                  style={{ display: 'none' }}
-                  onChange={handleFileChange}
-                />
+                <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/jpg,image/webp" style={{ display: 'none' }} onChange={handleFileChange} />
                 {planFile && (
-                  <button
-                    type="button"
-                    onClick={() => { setPlanFile(null); setPlanPreview(null); setIsPlanMode(false) }}
-                    style={{ marginTop: '8px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.85rem' }}
-                  >
+                  <button type="button" onClick={() => { setPlanFile(null); setPlanPreview(null); setIsPlanMode(false) }} style={{ marginTop: '8px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.85rem' }}>
                     × Remove plan
                   </button>
                 )}
@@ -275,7 +221,6 @@ function EstimatePageInner() {
 
             {/* Right column */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Job Description */}
               <div className="card" style={{ flex: 1 }}>
                 <h3 style={{ fontWeight: 700, marginBottom: '8px', fontSize: '1rem' }}>Job Description</h3>
                 <p style={{ color: '#64748b', fontSize: '0.82rem', marginBottom: '12px' }}>
@@ -285,7 +230,7 @@ function EstimatePageInner() {
                   className="input"
                   style={{ minHeight: '200px', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.6 }}
                   placeholder={isPlanMode
-                    ? 'Optional: Add any details not visible in the plan (e.g. existing conditions, special requirements, access issues)…'
+                    ? 'Optional: Add any details not visible in the plan…'
                     : 'e.g. Replace the water heater in the garage. 40-gallon gas unit, existing gas line and venting in place, needs new expansion tank and code-compliant shut-off valve. House built 2001, Dallas TX…'
                   }
                   value={jobDescription}
@@ -293,11 +238,17 @@ function EstimatePageInner() {
                 />
               </div>
 
-              {/* Confidence Tips */}
               <div style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '10px', padding: '16px' }}>
-                <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '0.85rem', marginBottom: '10px' }}>💡 Get a tighter range</div>
+                <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '0.85rem', marginBottom: '10px' }}>💡 What you get</div>
                 <ul style={{ color: '#94a3b8', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '5px', paddingLeft: '0', listStyle: 'none' }}>
-                  {['Include city/state for local labor rates', 'Specify square footage or linear footage', 'Mention existing conditions (age, access)', 'Note fixture counts or unit sizes', 'Upload a plan sheet for max accuracy'].map(tip => (
+                  {[
+                    'Line item breakdown (Materials, Labor, Equipment…)',
+                    'Editable assumptions that recalculate via AI',
+                    'Margin slider — adjust from 5% to 45%',
+                    '3 what-if scenarios (Budget, Premium, Phased)',
+                    'Refinement chat — iterate on the estimate',
+                    'Lock & export as PDF proposal',
+                  ].map(tip => (
                     <li key={tip} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                       <span style={{ color: '#f59e0b', flexShrink: 0 }}>→</span> {tip}
                     </li>
@@ -326,8 +277,8 @@ function EstimatePageInner() {
                   {loadingMsg || 'Generating…'}
                 </span>
               ) : isPlanMode
-                ? '📐 Analyze Plan & Generate Estimate'
-                : '⚡ Generate Low / Mid / High Estimate'
+                ? '📐 Analyze Plan & Build Estimate Workbench'
+                : '⚡ Generate Estimate Workbench'
               }
             </button>
             <p style={{ textAlign: 'center', marginTop: '12px', color: '#475569', fontSize: '0.82rem' }}>
