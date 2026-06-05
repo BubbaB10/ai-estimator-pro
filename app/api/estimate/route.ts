@@ -149,8 +149,7 @@ Generate a plan-based estimate. Since this is from a plan sheet, use HIGH confid
 Job description (if any): ${jobDescription || 'See uploaded plan sheet'}`
       : `Trade type: ${tradeType}${location ? `\nLocation/Region: ${location}` : ''}
 
-${isMultiScope ? 'Multi-scope job description:
-' : 'Job description: '}${jobDescription}
+${isMultiScope ? 'Multi-scope job description:\n' : 'Job description: '}${jobDescription}
 
 Generate a complete Low/Mid/High estimate for this job. Include all workbench fields especially the workbenchLineItems breakdown and 3 what-if scenarios.`
 
