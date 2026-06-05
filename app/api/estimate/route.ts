@@ -34,9 +34,21 @@ export async function POST(req: NextRequest) {
       location,
       planImageBase64,
       isPlanUpload = false,
+      isMultiScope = false,
     } = body
 
     const tradeIcon = getTradeIcon(tradeType)
+
+    const multiScopeInstruction = isMultiScope
+      ? `
+
+MULTI-SCOPE JOB: The job description contains multiple scopes labeled "Scope 1", "Scope 2", etc. You MUST:
+- Break out line items per scope section — clearly label each group in the lineItems descriptions using the format "[Scope name] description" (e.g. "[Foundation slab] Concrete pour", "[HVAC system] Unit installation")
+- Provide a combined Low/Mid/High across all scopes in the top-level conservative/mostLikely/fullScope fields
+- Your jobSummary should mention the total number of scopes and primary trades involved
+- The assumptions array should include scope-level assumptions where relevant, prefixed with the scope name
+- If a scope specifies square footage, use it for that scope's material and labor calculations`
+      : ''
 
     const systemPrompt = `You are an expert ${tradeType} contractor estimator with 25+ years of field experience. You specialize in helping small 1-5 person contractor shops price jobs correctly so they never undercharge.
 
@@ -137,15 +149,18 @@ Generate a plan-based estimate. Since this is from a plan sheet, use HIGH confid
 Job description (if any): ${jobDescription || 'See uploaded plan sheet'}`
       : `Trade type: ${tradeType}${location ? `\nLocation/Region: ${location}` : ''}
 
-Job description: ${jobDescription}
+${isMultiScope ? 'Multi-scope job description:
+' : 'Job description: '}${jobDescription}
 
 Generate a complete Low/Mid/High estimate for this job. Include all workbench fields especially the workbenchLineItems breakdown and 3 what-if scenarios.`
 
     let messages: OpenAI.Chat.ChatCompletionMessageParam[]
 
+    const finalSystemPrompt = systemPrompt + multiScopeInstruction
+
     if (planImageBase64 && isPlanUpload) {
       messages = [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: finalSystemPrompt },
         {
           role: 'user',
           content: [
@@ -162,7 +177,7 @@ Generate a complete Low/Mid/High estimate for this job. Include all workbench fi
       ]
     } else {
       messages = [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: finalSystemPrompt },
         { role: 'user', content: userMessage }
       ]
     }
