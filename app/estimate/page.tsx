@@ -137,7 +137,7 @@ function ScopeCard({ scope, index, onChange, onRemove, canRemove }: {
 function PlanUploadSection({ isPlanMode, planPreview, planFile, onDrop, onFileChange, onRemove, fileRef }: {
   isPlanMode: boolean; planPreview: string | null; planFile: File | null
   onDrop: (e: React.DragEvent) => void; onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  onRemove: () => void; fileRef: React.RefObject<HTMLInputElement | null>
+  onRemove: () => void; fileRef: React.RefObject<HTMLInputElement>
 }) {
   return (
     <div className="card" style={{ border: isPlanMode ? '2px solid #f59e0b' : '1px solid #334155' }}>
@@ -199,7 +199,7 @@ function EstimatePageInner() {
   const [loadingMsg, setLoadingMsg] = useState('')
   const [error, setError] = useState('')
   const [estimate, setEstimate] = useState<EstimateData | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const fileRef = useRef<HTMLInputElement>(null!)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
